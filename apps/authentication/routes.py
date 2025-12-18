@@ -280,8 +280,81 @@ def logout():
 
 
 
-    
+from flask import request, render_template, redirect, url_for, flash
 
+
+@blueprint.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        # Collect form data
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone_number = request.form.get('phone_number', '').strip()
+
+        # Default role
+        role = 'applicant'
+
+        # Basic validation (check if essential fields are filled)
+        if not username or not password or not first_name or not last_name or not email:
+            flash('Please fill in all required fields.', 'danger')
+            return render_template('accounts/signup.html')
+
+        try:
+            # Database connection
+            with get_db_connection() as conn:
+                with conn.cursor(dictionary=True) as cursor:
+
+                    # Check if the username already exists in the database
+                    cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+                    if cursor.fetchone():
+                        flash('Username already exists.', 'danger')
+                        return render_template('accounts/signup.html')
+
+                    # Check if the email already exists in the database
+                    cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+                    if cursor.fetchone():
+                        flash('Email address is already in use.', 'danger')
+                        return render_template('accounts/signup.html')
+
+                    # Insert the new user into the database (password is not hashed here)
+                    cursor.execute(
+                        """
+                        INSERT INTO users (
+                            username, password, role,
+                            first_name, last_name,
+                            email, phone_number,
+                            is_online
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
+                        """,
+                        (
+                            username,
+                            password,  # No password hashing
+                            role,
+                            first_name,
+                            last_name,
+                            email,
+                            phone_number
+                        )
+                    )
+
+                    # Commit the transaction
+                    conn.commit()
+
+                    # Success message and redirect to login page
+                    flash('Account created successfully. Please sign in.', 'success')
+                    return redirect(url_for('authentication_blueprint.login'))
+
+        except Exception as e:
+            # In case of error, flash an error message
+            flash('An error occurred during registration.', 'danger')
+            print(e)
+
+    # GET request: show the signup form
+    return render_template('accounts/signup.html')
 
 
 
@@ -336,6 +409,12 @@ def manage_users():
         return redirect(url_for('home_blueprint.index'))
 
     return render_template('accounts/manage_users.html', users=users, num=len(users))
+
+
+
+
+
+
 
 
 
