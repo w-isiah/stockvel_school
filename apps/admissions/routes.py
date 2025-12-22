@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 
-
-
-
 @blueprint.route('/add_admission', methods=['GET', 'POST'])
 def add_admission():
+    """Handle admission application form (GET for display, POST for submission)"""
+    
+    # Check user session
     user_id = session.get('id')
     if not user_id:
         flash("Session expired. Please log in again.", "danger")
@@ -36,7 +36,16 @@ def add_admission():
     cursor = connection.cursor(dictionary=True)
 
     try:
-        if request.method == 'POST':
+        # GET REQUEST: Display form with classes dropdown
+        if request.method == 'GET':
+            cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
+            classes = cursor.fetchall()
+            return render_template('admissions/add_admission.html', 
+                                 classes=classes, 
+                                 segment='add_admission')
+
+        # POST REQUEST: Process form submission
+        elif request.method == 'POST':
             connection.start_transaction()
 
             # 1. GENERATE UNIQUE REGISTRATION NUMBER
@@ -45,93 +54,121 @@ def add_admission():
             reg_no = f"SJS/{current_year}/{random_suffix}"
 
             # 2. INSERT GUARDIAN (Section E)
-            g_data = (
-                request.form.get('guardian_name'), request.form.get('relationship'),
-                request.form.get('phone_primary'), request.form.get('phone_alt'),
-                request.form.get('email'), request.form.get('occupation'),
-                request.form.get('physical_address')
+            guardian_data = (
+                request.form.get('guardian_name', '').strip(),
+                request.form.get('relationship', '').strip(),
+                request.form.get('phone_primary', '').strip(),
+                request.form.get('phone_alt', '').strip() or None,
+                request.form.get('email', '').strip(),
+                request.form.get('occupation', '').strip() or None,
+                request.form.get('physical_address', '').strip()
             )
-            cursor.execute('''INSERT INTO guardians (full_name, relationship, phone_primary, 
-                              phone_alt, email, occupation, physical_address) 
-                              VALUES (%s, %s, %s, %s, %s, %s, %s)''', g_data)
+            
+            cursor.execute('''INSERT INTO guardians 
+                              (full_name, relationship, phone_primary, phone_alt, 
+                               email, occupation, physical_address) 
+                              VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
+                           guardian_data)
             guardian_id = cursor.lastrowid
 
             # 3. FILE HANDLING (Section G)
             def save_admission_file(file_key, prefix):
+                """Helper function to save uploaded files"""
                 file = request.files.get(file_key)
-                if file and file.filename != '':
-                    ext = os.path.splitext(file.filename)[1]
-                    filename = secure_filename(f"{prefix}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}")
+                if file and file.filename:
+                    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                    original_ext = os.path.splitext(file.filename)[1].lower()
+                    filename = secure_filename(f"{prefix}_{timestamp}{original_ext}")
                     upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
                     os.makedirs(os.path.dirname(upload_path), exist_ok=True)
                     file.save(upload_path)
                     return filename
                 return None
 
+            # Save all uploaded files
             photo_name = save_admission_file('image', 'photo')
             birth_cert_name = save_admission_file('birth_cert', 'bcert')
             report_name = save_admission_file('school_report', 'report')
 
             # 4. INSERT PUPIL (Sections A, C, D, F)
-            # Include the reg_no in the tuple
-            p_data = (
+            pupil_data = (
                 guardian_id,
-                reg_no,  # <--- Added unique reg_no here
-                request.form.get('first_name'),
-                request.form.get('other_name'),
-                request.form.get('last_name'),
+                reg_no,
+                request.form.get('first_name', '').strip(),
+                request.form.get('other_name', '').strip() or None,
+                request.form.get('last_name', '').strip(),
                 request.form.get('date_of_birth'),
                 request.form.get('gender'),
-                request.form.get('nationality'),
-                request.form.get('address'),
-                request.form.get('languages_spoken'),
-                request.form.get('emergency_contact'),
-                request.form.get('medical_info'),
-                request.form.get('special_needs'),
-                request.form.get('prev_school_name'),
-                request.form.get('reason_for_leaving'),
+                request.form.get('nationality', 'Ugandan').strip(),
+                request.form.get('address', '').strip(),
+                request.form.get('languages_spoken', '').strip() or None,
+                request.form.get('emergency_contact', '').strip() or None,
+                request.form.get('medical_info', '').strip() or None,
+                request.form.get('special_needs', '').strip() or None,
+                request.form.get('prev_school_name', '').strip() or None,
+                request.form.get('reason_for_leaving', '').strip() or None,
                 photo_name
             )
-
-            cursor.execute('''INSERT INTO pupils_admission (
-                                guardian_id, reg_no, first_name, other_name,last_name,date_of_birth, gender, 
-                                nationality, address, languages_spoken, emergency_contact, 
-                                medical_info, special_needs, prev_school_name, 
-                                reason_for_leaving, image
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', p_data)
+            
+            cursor.execute('''INSERT INTO pupils_admission 
+                              (guardian_id, reg_no, first_name, other_name, last_name, 
+                               date_of_birth, gender, nationality, address, languages_spoken, 
+                               emergency_contact, medical_info, special_needs, 
+                               prev_school_name, reason_for_leaving, image) 
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                                      %s, %s, %s, %s, %s, %s)''', 
+                           pupil_data)
             pupil_id = cursor.lastrowid
 
             # 5. INSERT ADMISSION (Section B & Accountability)
-            cursor.execute('''INSERT INTO admissions (
-                                pupil_id, class_id, term_id, year_id, 
-                                birth_cert_path, prev_report_path, admission_status, created_by,date_created
-                            ) VALUES (%s, %s, %s, %s, %s, %s, 'Pending', %s,NOW())''', 
-                           (pupil_id, request.form.get('class_id'), request.form.get('term_id'), 
-                            request.form.get('year_id'), birth_cert_name, report_name, user_id))
+            admission_data = (
+                pupil_id,
+                request.form.get('class_id'),
+                request.form.get('term_id'),
+                request.form.get('year_id'),
+                birth_cert_name,
+                report_name,
+                'Pending',  # Initial status
+                user_id
+            )
+            
+            cursor.execute('''INSERT INTO admissions 
+                              (pupil_id, class_id, term_id, year_id, 
+                               birth_cert_path, prev_report_path, admission_status, created_by, date_created) 
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())''', 
+                           admission_data)
 
+            # Commit all changes
             connection.commit()
-            flash(f"Success! Admission {reg_no} has been submitted.", "success")
+            flash(f"Success! Admission {reg_no} has been submitted for review.", "success")
             return redirect(url_for('admissions_blueprint.add_admission'))
 
-        # GET REQUEST: Fetch classes for dropdown
-        cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
-        classes = cursor.fetchall()
-        return render_template('admissions/add_admission.html', classes=classes, segment='add_admission')
-
     except Exception as e:
+        # Rollback on error
         if connection.is_connected():
             connection.rollback()
+        
         logger.error(f"Admission Error: {str(e)}")
         flash(f"An error occurred: {str(e)}", "danger")
         
         # Re-fetch classes so the page can re-render on error
         cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
         classes = cursor.fetchall()
-        return render_template('admissions/add_admission.html', classes=classes, segment='add_admission')
+        return render_template('admissions/add_admission.html', 
+                             classes=classes, 
+                             segment='add_admission')
 
     finally:
-        if cursor: cursor.close()
-        if connection: connection.close()
+        # Cleanup resources
+        if cursor:
+            cursor.close()
+        if connection and connection.is_connected():
+            connection.close()
+
+
+
+
+
 
 
 
@@ -175,7 +212,7 @@ def admission_list():
             SELECT 
                 a.admission_id,
                 p.reg_no,
-                p.first_name AS full_name,
+                CONCAT_WS(' ', p.last_name, p.first_name, p.other_name) AS full_name,
                 COALESCE(c.class_name, 'N/A') AS class_name,
                 COALESCE(g.phone_primary, 'No Contact') AS guardian_contact,
                 a.admission_status,
@@ -206,19 +243,37 @@ def admission_list():
 
 
 
+
+
+
+
+from flask import current_app, session, request, flash, redirect, url_for
+from mysql.connector import IntegrityError
+
 @blueprint.route('/update_status/<int:admission_id>/<string:new_status>', methods=['POST'])
 def update_admission_status(admission_id, new_status):
+    """
+    Workflow:
+      - If Approved:
+          1) Lock admissions row, ensure it exists and is Pending.
+          2) Update admissions.admission_status = 'Approved'.
+          3) Read the admissions row to get pupil_id (applicant id).
+          4) Lock and read pupils_admission row for that pupil_id.
+          5) Insert a new row into pupils using the data from pupils_admission.
+      - If Rejected:
+          Validate rejection_reason and update admissions accordingly.
+    """
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
     try:
         connection.start_transaction()
 
-        # Fetch admission record
+        # Lock the admissions row first
         cursor.execute("""
             SELECT *
-            FROM pupils_admission
-            WHERE pupil_id = %s
+            FROM admissions
+            WHERE admission_id = %s
             FOR UPDATE
         """, (admission_id,))
         admission = cursor.fetchone()
@@ -227,8 +282,94 @@ def update_admission_status(admission_id, new_status):
             flash("Admission record not found.", "danger")
             return redirect(url_for('admissions_blueprint.admission_list'))
 
-        # APPROVE
+        # Prevent double-processing; only allow if Pending
+        current_status = admission.get('admission_status')
+        if current_status and current_status != 'Pending':
+            flash("This application has already been processed.", "warning")
+            return redirect(url_for('admissions_blueprint.admission_list'))
+
+        # APPROVE path
         if new_status == "Approved":
+            # 1) Update admissions status to Approved
+            cursor.execute("""
+                UPDATE admissions
+                SET admission_status = 'Approved'
+                WHERE admission_id = %s
+            """, (admission_id,))
+
+            # 2) Re-read the admissions row (still locked) to get linked pupil_id
+            cursor.execute("""
+                SELECT *
+                FROM admissions
+                WHERE admission_id = %s
+                FOR UPDATE
+            """, (admission_id,))
+            admission = cursor.fetchone()
+            src_pupil_id = admission.get('pupil_id')
+
+            if not src_pupil_id:
+                # Nothing to copy from — rollback and inform user
+                connection.rollback()
+                flash("Admission has no linked applicant record to register.", "danger")
+                return redirect(url_for('admissions_blueprint.admission_list'))
+
+            # 3) Lock and fetch applicant details from pupils_admission
+            cursor.execute("""
+                SELECT *
+                FROM pupils_admission
+                WHERE pupil_id = %s
+                FOR UPDATE
+            """, (src_pupil_id,))
+            applicant = cursor.fetchone()
+
+            if not applicant:
+                connection.rollback()
+                flash("Applicant details not found for this admission.", "danger")
+                return redirect(url_for('admissions_blueprint.admission_list'))
+
+            # 4) Check reg_no uniqueness in pupils (fail-fast)
+            reg_no = applicant.get('reg_no')
+            if reg_no:
+                cursor.execute("SELECT pupil_id FROM pupils WHERE reg_no = %s", (reg_no,))
+                if cursor.fetchone():
+                    connection.rollback()
+                    flash(f"Cannot approve: reg_no '{reg_no}' already exists in pupils.", "danger")
+                    return redirect(url_for('admissions_blueprint.admission_list'))
+
+            # 5) Build INSERT values in the same order as pupils table columns
+            values = (
+                applicant.get('guardian_id'),
+                applicant.get('reg_no'),
+                applicant.get('index_number'),
+                applicant.get('nin_number'),
+                applicant.get('home_district'),
+                applicant.get('emis_number'),
+                applicant.get('dorm_id'),
+                applicant.get('first_name'),
+                applicant.get('other_name'),
+                applicant.get('last_name'),
+                applicant.get('image'),
+                applicant.get('date_of_birth'),
+                applicant.get('gender'),
+                applicant.get('nationality'),
+                applicant.get('languages_spoken'),
+                applicant.get('stream_id'),
+                applicant.get('class_id'),
+                applicant.get('admission_date'),
+                applicant.get('year_id'),
+                applicant.get('term_id'),
+                applicant.get('address'),
+                applicant.get('emergency_contact'),
+                applicant.get('medical_info'),
+                applicant.get('special_needs'),
+                applicant.get('prev_school_name'),
+                applicant.get('reason_for_leaving'),
+                applicant.get('attendance_record'),
+                applicant.get('academic_performance'),
+                applicant.get('notes'),
+                applicant.get('residential_status'),
+                session.get('user_id')  # created_by
+            )
 
             cursor.execute("""
                 INSERT INTO pupils (
@@ -243,50 +384,64 @@ def update_admission_status(admission_id, new_status):
                     attendance_record, academic_performance,
                     notes, residential_status, created_by
                 ) VALUES (
-                    %(guardian_id)s, %(reg_no)s, %(index_number)s, %(nin_number)s,
-                    %(home_district)s, %(emis_number)s, %(dorm_id)s,
-                    %(first_name)s, %(other_name)s, %(last_name)s,
-                    %(image)s, %(date_of_birth)s, %(gender)s, %(nationality)s,
-                    %(languages_spoken)s, %(stream_id)s, %(class_id)s,
-                    %(admission_date)s, %(year_id)s, %(term_id)s,
-                    %(address)s, %(emergency_contact)s, %(medical_info)s,
-                    %(special_needs)s, %(prev_school_name)s, %(reason_for_leaving)s,
-                    %(attendance_record)s, %(academic_performance)s,
-                    %(notes)s, %(residential_status)s, %s
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s
                 )
-            """, {**admission, "created_by": session.get("user_id")})
+            """, values)
 
-            cursor.execute("""
-                UPDATE pupils_admission
-                SET admission_status = 'Approved'
-                WHERE pupil_id = %s
-            """, (admission_id,))
+            # Optionally capture the created pupil_id
+            new_pupil_id = cursor.lastrowid
+
+            # Commit the transaction (both admissions update and pupils insert)
+            connection.commit()
 
             flash("Application approved and pupil registered successfully.", "success")
 
-        # REJECT
+        # REJECT path
         elif new_status == "Rejected":
             reason = request.form.get("rejection_reason", "").strip()
-
             if not reason:
                 flash("Rejection reason is required.", "warning")
                 return redirect(url_for('admissions_blueprint.admission_list'))
 
             cursor.execute("""
-                UPDATE pupils_admission
+                UPDATE admissions
                 SET admission_status = 'Rejected',
                     rejection_reason = %s,
                     rejected_by = %s,
                     rejected_at = NOW()
-                WHERE pupil_id = %s
+                WHERE admission_id = %s
             """, (reason, session.get("user_id"), admission_id))
 
+            connection.commit()
             flash("Application rejected successfully.", "info")
 
-        connection.commit()
+        else:
+            flash("Unknown status.", "warning")
+            connection.rollback()
+
+    except IntegrityError as ie:
+        connection.rollback()
+        try:
+            current_app.logger.exception("Integrity error updating admission status")
+        except Exception:
+            print("Integrity error:", ie)
+        flash(f"Database integrity error: {ie}", "danger")
 
     except Exception as e:
         connection.rollback()
+        try:
+            current_app.logger.exception("Error updating admission status")
+        except Exception:
+            print("Error updating admission status:", e)
         flash(f"Database error: {str(e)}", "danger")
 
     finally:
@@ -297,14 +452,33 @@ def update_admission_status(admission_id, new_status):
 
 
 
-
+    
 
 @blueprint.route('/bulk_update_status', methods=['POST'])
 def bulk_update_admission_status():
-    ids = request.form.getlist('admission_ids')
+    """
+    Approve multiple admissions selected from the UI.
 
+    Flow:
+      1. Read admission_ids[] from the form and validate/convert to ints.
+      2. Lock the corresponding admissions rows (FOR UPDATE) and ensure they are Pending.
+      3. For each admission:
+         - Ensure it has a linked pupils_admission record.
+         - Ensure the applicant's reg_no doesn't already exist in pupils.
+      4. If any validation errors, rollback and show a combined error flash.
+      5. Otherwise insert each applicant into pupils and update admissions.admission_status = 'Approved'.
+      6. Commit and flash success.
+    """
+    ids = request.form.getlist('admission_ids[]') or request.form.getlist('admission_ids')
     if not ids:
         flash("No applications selected.", "warning")
+        return redirect(url_for('admissions_blueprint.admission_list'))
+
+    # Validate and convert to integers
+    try:
+        admission_ids = tuple(int(x) for x in ids)
+    except ValueError:
+        flash("Invalid application IDs provided.", "danger")
         return redirect(url_for('admissions_blueprint.admission_list'))
 
     connection = get_db_connection()
@@ -313,21 +487,110 @@ def bulk_update_admission_status():
     try:
         connection.start_transaction()
 
+        # Lock and fetch selected admissions that are still Pending
+        placeholders = ','.join(['%s'] * len(admission_ids))
         cursor.execute(f"""
             SELECT *
-            FROM pupils_admission
-            WHERE pupil_id IN ({','.join(['%s'] * len(ids))})
-            AND admission_status = 'Pending'
+            FROM admissions
+            WHERE admission_id IN ({placeholders})
+              AND admission_status = 'Pending'
             FOR UPDATE
-        """, ids)
-
+        """, admission_ids)
         admissions = cursor.fetchall()
 
         if not admissions:
-            flash("No pending applications found.", "info")
+            flash("No pending applications found for the selected items.", "info")
+            connection.rollback()
             return redirect(url_for('admissions_blueprint.admission_list'))
 
+        # Validate each admission and prepare list to insert
+        to_process = []
+        errors = []
+
+        # Build a set of reg_nos we will insert to detect duplicates among selected rows
+        regnos_being_inserted = set()
+
         for adm in admissions:
+            admission_id = adm['admission_id']
+            src_pupil_id = adm.get('pupil_id')
+            if not src_pupil_id:
+                errors.append(f"Admission {admission_id}: no linked applicant record.")
+                continue
+
+            # Lock and fetch applicant data
+            cursor.execute("""
+                SELECT *
+                FROM pupils_admission
+                WHERE pupil_id = %s
+                FOR UPDATE
+            """, (src_pupil_id,))
+            applicant = cursor.fetchone()
+            if not applicant:
+                errors.append(f"Admission {admission_id}: applicant details not found.")
+                continue
+
+            reg_no = (applicant.get('reg_no') or "").strip()
+            if reg_no:
+                # Check for existing reg_no in pupils
+                cursor.execute("SELECT pupil_id FROM pupils WHERE reg_no = %s", (reg_no,))
+                if cursor.fetchone():
+                    errors.append(f"Admission {admission_id}: reg_no '{reg_no}' already exists in pupils.")
+                    continue
+
+                # Check duplicates among this batch
+                if reg_no in regnos_being_inserted:
+                    errors.append(f"Admission {admission_id}: duplicate reg_no '{reg_no}' in selected applications.")
+                    continue
+
+                regnos_being_inserted.add(reg_no)
+
+            # All good for this applicant
+            to_process.append((adm, applicant))
+
+        if errors:
+            # Validation failed for one or more items — rollback and report
+            connection.rollback()
+            flash("Bulk approval aborted: " + " ".join(errors), "danger")
+            return redirect(url_for('admissions_blueprint.admission_list'))
+
+        # Perform inserts and updates
+        approved_count = 0
+        for adm, applicant in to_process:
+            # Build INSERT values in the same order as pupils table
+            values = (
+                applicant.get('guardian_id'),
+                applicant.get('reg_no'),
+                applicant.get('index_number'),
+                applicant.get('nin_number'),
+                applicant.get('home_district'),
+                applicant.get('emis_number'),
+                applicant.get('dorm_id'),
+                applicant.get('first_name'),
+                applicant.get('other_name'),
+                applicant.get('last_name'),
+                applicant.get('image'),
+                applicant.get('date_of_birth'),
+                applicant.get('gender'),
+                applicant.get('nationality'),
+                applicant.get('languages_spoken'),
+                applicant.get('stream_id'),
+                applicant.get('class_id'),
+                applicant.get('admission_date'),
+                applicant.get('year_id'),
+                applicant.get('term_id'),
+                applicant.get('address'),
+                applicant.get('emergency_contact'),
+                applicant.get('medical_info'),
+                applicant.get('special_needs'),
+                applicant.get('prev_school_name'),
+                applicant.get('reason_for_leaving'),
+                applicant.get('attendance_record'),
+                applicant.get('academic_performance'),
+                applicant.get('notes'),
+                applicant.get('residential_status'),
+                session.get('user_id')
+            )
+
             cursor.execute("""
                 INSERT INTO pupils (
                     guardian_id, reg_no, index_number, nin_number,
@@ -341,30 +604,37 @@ def bulk_update_admission_status():
                     attendance_record, academic_performance,
                     notes, residential_status, created_by
                 ) VALUES (
-                    %(guardian_id)s, %(reg_no)s, %(index_number)s, %(nin_number)s,
-                    %(home_district)s, %(emis_number)s, %(dorm_id)s,
-                    %(first_name)s, %(other_name)s, %(last_name)s,
-                    %(image)s, %(date_of_birth)s, %(gender)s, %(nationality)s,
-                    %(languages_spoken)s, %(stream_id)s, %(class_id)s,
-                    %(admission_date)s, %(year_id)s, %(term_id)s,
-                    %(address)s, %(emergency_contact)s, %(medical_info)s,
-                    %(special_needs)s, %(prev_school_name)s, %(reason_for_leaving)s,
-                    %(attendance_record)s, %(academic_performance)s,
-                    %(notes)s, %(residential_status)s, %s
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s
                 )
-            """, {**adm, "created_by": session.get("user_id")})
+            """, values)
 
+            # Update admissions.admission_status to Approved
             cursor.execute("""
-                UPDATE pupils_admission
+                UPDATE admissions
                 SET admission_status = 'Approved'
-                WHERE pupil_id = %s
-            """, (adm["pupil_id"],))
+                WHERE admission_id = %s
+            """, (adm['admission_id'],))
+
+            approved_count += 1
 
         connection.commit()
-        flash(f"{len(admissions)} applications approved successfully.", "success")
+        flash(f"{approved_count} application(s) approved successfully.", "success")
 
     except Exception as e:
         connection.rollback()
+        try:
+            current_app.logger.exception("Bulk approval error")
+        except Exception:
+            print("Bulk approval error:", e)
         flash(f"Bulk approval failed: {str(e)}", "danger")
 
     finally:
@@ -372,6 +642,7 @@ def bulk_update_admission_status():
         connection.close()
 
     return redirect(url_for('admissions_blueprint.admission_list'))
+
 
 
 
