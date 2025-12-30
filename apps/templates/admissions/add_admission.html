@@ -3,187 +3,157 @@
 {% block title %}New Admission{% endblock %}
 
 {% block stylesheets %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+<link rel="stylesheet" href="/static/assets/plugins/fontawesome-free/css/all.min.css">
+<link rel="stylesheet" href="/static/assets/css/select2.min.css">
+<link rel="stylesheet" href="/static/assets/css/select2-bootstrap4.min.css">
 <link rel="stylesheet" href="/static/assets/css/adminlte.min.css">
-<link href="/static/assets/css/select2.min.css" rel="stylesheet" />
+
 <style>
-    .section-title { 
-        background: #f4f6f9; 
-        padding: 12px; 
-        margin: 25px 0 15px 0; 
-        border-left: 5px solid #007bff; 
-        font-weight: bold; 
+    .section-title {
+        background: #f8f9fa;
+        padding: 10px 15px;
+        margin: 30px 0 20px 0;
+        border-left: 4px solid #007bff;
+        font-weight: 700;
         text-transform: uppercase;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         color: #495057;
+        display: flex;
+        align-items: center;
     }
-    .alert-container { padding: 15px; }
+    .section-title i { margin-right: 10px; color: #007bff; }
+    .required-star { color: red; margin-left: 3px; }
+    .card-primary.card-outline { border-top: 3px solid #007bff; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="content-wrapper">
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="alert-container">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show">
-                {{ message }} 
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    {% endwith %}
-
-    <!-- Page Header -->
     <section class="content-header">
         <div class="container-fluid">
             <div class="row mb-2">
                 <div class="col-sm-6">
-                    <h1>New Admission</h1>
+                    <h1><i class="fas fa-user-plus mr-2"></i>New Admission</h1>
                 </div>
                 <div class="col-sm-6">
                     <ol class="breadcrumb float-sm-right">
                         <li class="breadcrumb-item"><a href="/index">Home</a></li>
-                        <li class="breadcrumb-item"><a href="/admission_list">Admissions List</a></li>
-                        <li class="breadcrumb-item active">Add New</li>
+                        <li class="breadcrumb-item"><a href="/admission_list">Admissions</a></li>
+                        <li class="breadcrumb-item active">New Application</li>
                     </ol>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Main Form Content -->
     <section class="content">
         <div class="container-fluid">
-            <div class="card card-outline card-primary mt-3">
-                <!-- Card Header -->
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title mb-0">Online Admission Application Form</h3>
-                    <div class="btn-group">
-                        <a href="/admission_list" class="btn btn-primary btn-sm">Admissions List</a>
-                        <a href="/inventory_index" class="btn btn-success btn-sm">Inventory Dashboard</a>
-                        <a href="/p_restock" class="btn btn-primary btn-sm">Add Stock</a>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm">
+                        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                        <i class="icon fas fa-info-circle"></i> {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card card-primary card-outline">
+                <div class="card-header">
+                    <h3 class="card-title text-bold">Online Admission Application Form</h3>
+                    <div class="card-tools">
+                        <a href="/admission_list" class="btn btn-tool btn-primary text-white">
+                            <i class="fas fa-list mr-1"></i> View All
+                        </a>
                     </div>
                 </div>
 
-                <!-- Application Form -->
                 <form action="{{ url_for('admissions_blueprint.add_admission') }}" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     
                     <div class="card-body">
                         
-                        <!-- Section A: Child's Details -->
-                        <div class="section-title">Section A: Child's Details</div>
-                        
+                        <div class="section-title"><i class="fas fa-child"></i> Section A: Child's Details</div>
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="row mb-3">
-                                    <label for="first_name" class="col-sm-3 col-form-label">
-                                        First Name: *
-                                    </label>
-                                    <div class="col-sm-9">
-                                        <input type="text" 
-                                               name="first_name" 
-                                               class="form-control" 
-                                               placeholder="Enter First Name" 
-                                               required />
-                                    </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>First Name<span class="required-star">*</span></label>
+                                    <input type="text" name="first_name" class="form-control" placeholder="First Name" required>
                                 </div>
                             </div>
-                            
-                            <div class="col-md-6">
-                                <div class="row mb-3">
-                                    <label for="other_name" class="col-sm-3 col-form-label">
-                                        Other Name:
-                                    </label>
-                                    <div class="col-sm-9">
-                                        <input type="text" 
-                                               name="other_name" 
-                                               class="form-control" 
-                                               placeholder="Enter Other Name" />
-                                    </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Other Name</label>
+                                    <input type="text" name="other_name" class="form-control" placeholder="Middle Name">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Last Name<span class="required-star">*</span></label>
+                                    <input type="text" name="last_name" class="form-control" placeholder="Surname" required>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="row mb-3">
-                                    <label for="last_name" class="col-sm-3 col-form-label">
-                                        Last Name: *
-                                    </label>
-                                    <div class="col-sm-9">
-                                        <input type="text" 
-                                               name="last_name" 
-                                               class="form-control" 
-                                               placeholder="Enter Last Name" 
-                                               required />
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Date of Birth *</label>
+                                    <label>Date of Birth<span class="required-star">*</span></label>
                                     <input type="date" name="date_of_birth" class="form-control" required>
                                 </div>
                             </div>
-                            
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Gender *</label>
-                                    <select name="gender" class="form-control" required>
-                                        <option value="">Select</option>
+                                    <label>Gender<span class="required-star">*</span></label>
+                                    <select name="gender" class="form-control select2bs4" required>
+                                        <option value="">Select Gender</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
                                     </select>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Nationality *</label>
+                                    <label>Nationality<span class="required-star">*</span></label>
                                     <input type="text" name="nationality" class="form-control" value="Ugandan" required>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label>Home Address *</label>
-                                    <input type="text" name="address" class="form-control" required>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label>Language(s) Spoken at Home</label>
-                                    <input type="text" name="languages_spoken" class="form-control">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section B: Class Applied For -->
-                        <div class="section-title">Section B: Class Applied For</div>
-                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label>Home Address<span class="required-star">*</span></label>
+                                    <input type="text" name="address" class="form-control" placeholder="Village/Cell, Parish, District" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Languages Spoken at Home</label>
+                                    <input type="text" name="languages_spoken" class="form-control" placeholder="e.g., English, Luganda">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-title"><i class="fas fa-school"></i> Section B: Class Applied For</div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Applying for Class *</label>
-                                    <select name="class_id" class="form-control select2" required>
+                                    <label>Applying for Class<span class="required-star">*</span></label>
+                                    <select name="class_id" class="form-control select2bs4" required>
+                                        <option value="">Select Class</option>
                                         {% for cls in classes %}
                                         <option value="{{ cls.class_id }}">{{ cls.class_name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Proposed Term of Entry *</label>
+                                    <label>Proposed Term of Entry<span class="required-star">*</span></label>
                                     <select name="term_id" class="form-control" required>
                                         <option value="1">Term I</option>
                                         <option value="2">Term II</option>
@@ -191,18 +161,19 @@
                                     </select>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Academic Year *</label>
-                                    <input type="text" name="year_id" class="form-control" placeholder="e.g. 2025" required>
+                                    <label>Study Year<span class="required-star">*</span></label>
+                                    <select name="year_id" class="form-control select2bs4" required>
+                                        {% for study_year in study_years %}
+                                        <option value="{{ study_year.year_id }}">{{ study_year.year_name }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section C: Previous School Details -->
-                        <div class="section-title">Section C: Previous School Details (If Applicable)</div>
-                        
+                        <div class="section-title"><i class="fas fa-history"></i> Section C: Previous School Details</div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
@@ -210,14 +181,12 @@
                                     <input type="text" name="prev_school_name" class="form-control">
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Class Last Attended</label>
                                     <input type="text" name="prev_class_attended" class="form-control">
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Reason for Leaving</label>
@@ -226,55 +195,45 @@
                             </div>
                         </div>
 
-                        <!-- Section D: Health & Special Needs -->
-                        <div class="section-title">Section D: Health & Special Needs</div>
-                        
+                        <div class="section-title"><i class="fas fa-notes-medical"></i> Section D: Health & Special Needs</div>
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-group">
-                                    <label>Any Medical Condition? *</label>
+                                    <label>Any Medical Condition?<span class="required-star">*</span></label>
                                     <select name="has_medical" class="form-control" required>
                                         <option value="No">No</option>
                                         <option value="Yes">Yes</option>
                                     </select>
                                 </div>
                             </div>
-                            
-                            <div class="col-md-8">
+                            <div class="col-md-9">
                                 <div class="form-group">
-                                    <label>If yes, please specify / List Allergies</label>
-                                    <input type="text" name="medical_info" class="form-control" placeholder="Medical conditions or allergies">
+                                    <label>Specify Allergies or Conditions</label>
+                                    <input type="text" name="medical_info" class="form-control" placeholder="If yes, please details...">
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="row">
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <label>Special Learning Needs or Disabilities?</label>
-                                    <textarea name="special_needs" class="form-control" rows="2" placeholder="Please specify if any"></textarea>
+                                    <label>Special Learning Needs or Disabilities</label>
+                                    <textarea name="special_needs" class="form-control" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section E: Parent / Guardian Details -->
-                        <div class="section-title">Section E: Parent / Guardian Details</div>
-                        
+                        <div class="section-title"><i class="fas fa-users"></i> Section E: Parent / Guardian Details</div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Full Name *</label>
+                                    <label>Full Name<span class="required-star">*</span></label>
                                     <input type="text" name="guardian_name" class="form-control" required>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Relationship to Child *</label>
-                                    <input type="text" name="relationship" class="form-control" required>
+                                    <label>Relationship to Child<span class="required-star">*</span></label>
+                                    <input type="text" name="relationship" class="form-control" placeholder="Father, Mother, Aunt..." required>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Occupation</label>
@@ -282,42 +241,35 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Primary Telephone *</label>
+                                    <label>Primary Phone<span class="required-star">*</span></label>
                                     <input type="text" name="phone_primary" class="form-control" required>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Alternative Telephone</label>
+                                    <label>Alternative Phone</label>
                                     <input type="text" name="phone_alt" class="form-control">
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Email Address *</label>
+                                    <label>Email Address<span class="required-star">*</span></label>
                                     <input type="email" name="email" class="form-control" required>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="row">
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <label>Physical Address *</label>
+                                    <label>Physical Workplace Address<span class="required-star">*</span></label>
                                     <input type="text" name="physical_address" class="form-control" required>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section F: Emergency Contact -->
-                        <div class="section-title">Section F: Emergency Contact (If different)</div>
-                        
+                        <div class="section-title"><i class="fas fa-ambulance"></i> Section F: Emergency Contact</div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
@@ -325,14 +277,12 @@
                                     <input type="text" name="emergency_contact_name" class="form-control">
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Relationship</label>
                                     <input type="text" name="emergency_relationship" class="form-control">
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Emergency Phone</label>
@@ -341,75 +291,81 @@
                             </div>
                         </div>
 
-                        <!-- Section G: Document Uploads -->
-                        <div class="section-title">Section G: Document Uploads</div>
-                        
+                        <div class="section-title"><i class="fas fa-paperclip"></i> Section G: Document Uploads</div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Passport-size Photo</label>
-                                    <input type="file" name="image" class="form-control" accept="image/*">
+                                    <div class="custom-file">
+                                        <input type="file" name="image" class="custom-file-input" accept="image/*">
+                                        <label class="custom-file-label">Choose photo</label>
+                                    </div>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Birth Certificate</label>
-                                    <input type="file" name="birth_cert" class="form-control" accept=".pdf,.jpg,.png">
+                                    <div class="custom-file">
+                                        <input type="file" name="birth_cert" class="custom-file-input">
+                                        <label class="custom-file-label">Choose file</label>
+                                    </div>
                                 </div>
                             </div>
-                            
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Previous School Report</label>
-                                    <input type="file" name="school_report" class="form-control" accept=".pdf,.jpg,.png">
+                                    <div class="custom-file">
+                                        <input type="file" name="school_report" class="custom-file-input">
+                                        <label class="custom-file-label">Choose file</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section H: Declaration -->
-                        <div class="section-title">Section H: Declaration</div>
-                        
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" name="declaration_agree" class="custom-control-input" id="declarationCheck" required>
-                                    <label class="custom-control-label" for="declarationCheck">
-                                        I confirm that the information provided is true and correct. I agree to the terms and conditions of Stokvel Junior School *
-                                    </label>
-                                </div>
-                            </div>
+                        <div class="section-title"><i class="fas fa-file-contract"></i> Section H: Declaration</div>
+                        <div class="custom-control custom-checkbox mb-3">
+                            <input type="checkbox" name="declaration_agree" class="custom-control-input" id="declarationCheck" required>
+                            <label class="custom-control-label font-weight-normal" for="declarationCheck">
+                                I confirm that the information provided is true and correct. I agree to the terms and conditions of Stokvel Junior School<span class="required-star">*</span>
+                            </label>
                         </div>
 
-                    </div> <!-- /.card-body -->
-                    
-                    <!-- Form Footer -->
-                    <div class="card-footer text-center">
-                        <button type="reset" class="btn btn-default mr-2">Clear Form</button>
-                        <button type="submit" class="btn btn-primary btn-lg">Submit Application</button>
+                    </div> <div class="card-footer bg-white text-right">
+                        <button type="reset" class="btn btn-default mr-2">
+                            <i class="fas fa-undo mr-1"></i> Clear Form
+                        </button>
+                        <button type="submit" class="btn btn-primary px-5">
+                            <i class="fas fa-paper-plane mr-1"></i> Submit Application
+                        </button>
                     </div>
                 </form>
-            </div> <!-- /.card -->
-        </div> <!-- /.container-fluid -->
-    </section> <!-- /.content -->
-</div> <!-- /.content-wrapper -->
+            </div>
+        </div>
+    </section>
+</div>
 {% endblock %}
 
 {% block javascripts %}
 <script src="/static/assets/plugins/jquery/jquery.min.js"></script>
 <script src="/static/assets/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script src="/static/assets/js/adminlte.min.js"></script>
+<script src="/static/assets/plugins/bs-custom-file-input/bs-custom-file-input.min.js"></script>
 <script src="/static/assets/js/select2.min.js"></script>
+<script src="/static/assets/js/adminlte.min.js"></script>
+
 <script>
     $(document).ready(function () {
-        // Initialize Select2
-        $('.select2').select2({
-            theme: 'bootstrap4'
+        // Initialize Select2 with Bootstrap 4 theme
+        $('.select2bs4').select2({
+            theme: 'bootstrap4',
+            width: '100%'
         });
 
-        // Auto-dismiss alerts after 5 seconds
+        // Initialize Custom File Input (shows filename after selection)
+        bsCustomFileInput.init();
+
+        // Auto-dismiss alerts
         setTimeout(function() {
-            $(".alert").alert('close');
+            $(".alert").fadeOut('slow');
         }, 5000);
     });
 </script>

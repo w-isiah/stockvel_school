@@ -40,8 +40,12 @@ def add_admission():
         if request.method == 'GET':
             cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
             classes = cursor.fetchall()
+
+            cursor.execute('SELECT year_id, year_name FROM study_year ORDER BY year_name')
+            study_years = cursor.fetchall()
             return render_template('admissions/add_admission.html', 
-                                 classes=classes, 
+                                 classes=classes,
+                                 study_years=study_years, 
                                  segment='add_admission')
 
         # POST REQUEST: Process form submission
@@ -176,9 +180,12 @@ def add_admission():
 
 
 
+
+
+
 @blueprint.route('/admission_list')
 def admission_list():
-    """View and filter all admission applications."""
+    """View and filter admission applications by year, name, date, and reg_no."""
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
@@ -186,44 +193,70 @@ def admission_list():
         # 1. Load filter options for dropdowns
         cursor.execute('SELECT class_id, class_name FROM classes ORDER BY class_name')
         class_list = cursor.fetchall()
+        
+        cursor.execute('SELECT year_id, year_name FROM study_year ORDER BY year_name DESC')
+        year_list = cursor.fetchall()
 
-        # 2. Get filter parameters
+        # 2. Get search/filter parameters
         status = request.args.get('status', '').strip()
         class_id = request.args.get('class_id', '').strip()
+        year_id = request.args.get('year_id', '').strip()
         search_name = request.args.get('name', '').strip()
+        search_reg = request.args.get('reg_no', '').strip()
+        search_date = request.args.get('date', '').strip() # Expected format: YYYY-MM-DD
 
         params = {}
         filters = []
 
+        # --- Dynamic Filter Building ---
         if status:
             filters.append("a.admission_status = %(status)s")
             params['status'] = status
+        
         if class_id:
             filters.append("a.class_id = %(class_id)s")
             params['class_id'] = class_id
+
+        if year_id:
+            filters.append("a.year_id = %(year_id)s")
+            params['year_id'] = year_id
+
         if search_name:
-            filters.append("p.first_name LIKE %(name)s")
+            filters.append("(p.first_name LIKE %(name)s OR p.last_name LIKE %(name)s OR p.other_name LIKE %(name)s)")
             params['name'] = f"%{search_name}%"
+
+        if search_reg:
+            filters.append("p.reg_no LIKE %(reg_no)s")
+            params['reg_no'] = f"%{search_reg}%"
+
+        if search_date:
+            # Filters by the date part of the datetime/timestamp field
+            filters.append("DATE(a.date_created) = %(date)s")
+            params['date'] = search_date
 
         where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
 
-        # 3. Main Query with LEFT JOINs and NULL handling
+        # 3. Main Query with Joins
         query = f"""
             SELECT 
                 a.admission_id,
                 p.reg_no,
-                CONCAT_WS(' ', p.last_name, p.first_name, p.other_name) AS full_name,
+                a.rejection_reason,
+                CONCAT_WS(' ', p.first_name, p.other_name, p.last_name) AS full_name,
                 COALESCE(c.class_name, 'N/A') AS class_name,
+                COALESCE(sy.year_name, 'N/A') AS study_year,
                 COALESCE(g.phone_primary, 'No Contact') AS guardian_contact,
                 a.admission_status,
                 a.date_created
             FROM admissions a
             INNER JOIN pupils_admission p ON a.pupil_id = p.pupil_id
+            LEFT JOIN study_year sy ON a.year_id = sy.year_id
+            LEFT JOIN classes c ON CAST(a.class_id AS UNSIGNED) = c.class_id
             LEFT JOIN guardians g ON p.guardian_id = g.guardian_id
-            LEFT JOIN classes c ON a.class_id = c.class_id
             {where_clause}
             ORDER BY a.date_created DESC
         """
+        
         cursor.execute(query, params)
         admissions = cursor.fetchall()
 
@@ -231,11 +264,23 @@ def admission_list():
             'admissions/admission_list.html',
             admissions=admissions,
             class_list=class_list,
-            filters={'status': status, 'class_id': class_id, 'name': search_name}
+            year_list=year_list,
+            filters={
+                'status': status, 
+                'class_id': class_id, 
+                'year_id': year_id,
+                'name': search_name,
+                'reg_no': search_reg,
+                'date': search_date
+            }
         )
+        
     finally:
         cursor.close()
         connection.close()
+
+
+        
 
 
 
