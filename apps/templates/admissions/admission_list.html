@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 <link rel="stylesheet" href="/static/assets/css/adminlte.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="/static/assets/css/select2.min.css">
 
 <style>
   .status-badge { width: 100px; font-weight: 600; text-align: center; display: block; }
@@ -21,6 +22,7 @@
     background: none; border: none; width: 100%; text-align: left; padding: .4rem 1rem; cursor: pointer;
   }
   .filter-card { background: #f8f9fa; border-left: 4px solid #007bff; }
+  .badge-details { font-size: 0.75rem; margin-right: 2px; }
 </style>
 {% endblock %}
 
@@ -28,13 +30,13 @@
 <div class="content-wrapper">
 
   {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div id="flash-data" style="display:none">
-      {% for category, message in messages %}
-        <span data-category="{{ category }}" data-message="{{ message|e }}"></span>
-      {% endfor %}
-    </div>
-    {% endif %}
+  {% if messages %}
+  <div id="flash-data" style="display:none">
+    {% for category, message in messages %}
+    <span data-category="{{ category }}" data-message="{{ message|e }}"></span>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% endwith %}
 
   <section class="content-header">
@@ -56,18 +58,36 @@
         <div class="card-body">
           <form method="GET" action="{{ url_for('admissions_blueprint.admission_list') }}" class="row">
             <div class="col-md-3 mb-2">
-              <label>Student Name</label>
-              <input type="text" name="name" class="form-control" value="{{ filters.name or '' }}" placeholder="Search names...">
+              <label>Student Search</label>
+              <div class="input-group">
+                <input type="text" name="name" class="form-control" value="{{ filters.name or '' }}" placeholder="Name...">
+                <input type="text" name="reg_no" class="form-control" value="{{ filters.reg_no or '' }}" placeholder="Reg No...">
+              </div>
             </div>
 
-            <div class="col-md-3 mb-2">
-              <label>Registration No</label>
-              <input type="text" name="reg_no" class="form-control" value="{{ filters.reg_no or '' }}" placeholder="e.g. 2024/001">
+            <div class="col-md-2 mb-2">
+              <label>Academic Year</label>
+              <select name="year_id" class="form-control select2">
+                <option value="">All Years</option>
+                {% for y in year_list %}
+                <option value="{{ y.year_id }}" {{ 'selected' if filters.year_id == y.year_id|string }}>{{ y.year_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-2 mb-2">
+              <label>Term</label>
+              <select name="term_id" class="form-control select2">
+                <option value="">All Terms</option>
+                {% for t in term_list %}
+                <option value="{{ t.term_id }}" {{ 'selected' if filters.term_id == t.term_id|string }}>{{ t.term_name }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <div class="col-md-2 mb-2">
               <label>Status</label>
-              <select name="status" class="form-control">
+              <select name="status" class="form-control select2">
                 <option value="">All Statuses</option>
                 <option value="Pending" {{ 'selected' if filters.status=='Pending' }}>Pending</option>
                 <option value="Approved" {{ 'selected' if filters.status=='Approved' }}>Approved</option>
@@ -75,21 +95,12 @@
               </select>
             </div>
 
-            <div class="col-md-2 mb-2">
-              <label>Academic Year</label>
-              <select name="year_id" class="form-control">
-                <option value="">All Years</option>
-                {% for y in year_list %}
-                <option value="{{ y.year_id }}" {{ 'selected' if filters.year_id == y.year_id|string }}>
-                  {{ y.year_name }}
-                </option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="col-md-2 mb-2">
-              <label>Applied Date</label>
-              <input type="date" name="date" class="form-control" value="{{ filters.date or '' }}">
+            <div class="col-md-3 mb-2">
+              <label>Date Range (From - To)</label>
+              <div class="input-group">
+                <input type="date" name="start_date" class="form-control" value="{{ filters.start_date or '' }}">
+                <input type="date" name="end_date" class="form-control" value="{{ filters.end_date or '' }}">
+              </div>
             </div>
 
             <div class="col-12 mt-3 d-flex justify-content-end">
@@ -111,7 +122,6 @@
 
   <section class="content pb-5">
     <div class="container-fluid">
-      
       <form id="bulkForm" method="POST" action="{{ url_for('admissions_blueprint.bulk_update_admission_status') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -133,7 +143,7 @@
                   <th>Date</th>
                   <th>Reg No</th>
                   <th>Student Name</th>
-                  <th>Class / Year</th>
+                  <th>Class / Year / Term</th>
                   <th>Status</th>
                   <th class="text-center">Actions</th>
                 </tr>
@@ -143,28 +153,29 @@
                 <tr>
                   <td class="text-center">
                     {% if session['role'] == 'admin' and adm.admission_status == 'Pending' %}
-                      <input type="checkbox" name="admission_ids[]" value="{{ adm.admission_id }}" class="row-checkbox">
+                    <input type="checkbox" name="admission_ids[]" value="{{ adm.admission_id }}" class="row-checkbox">
                     {% else %}
-                      <i class="fas fa-lock text-muted" title="Status locked"></i>
+                    <i class="fas fa-lock text-muted" title="Status locked"></i>
                     {% endif %}
                   </td>
                   <td>{{ adm.date_created.strftime('%d %b %Y') if adm.date_created }}</td>
                   <td class="text-primary font-weight-bold">{{ adm.reg_no }}</td>
                   <td>{{ adm.full_name }}</td>
                   <td>
-                    {{ adm.class_name }}<br>
-                    <small class="badge badge-light border">{{ adm.study_year }}</small>
+                    <span class="text-bold">{{ adm.class_name }}</span><br>
+                    <small class="badge badge-light border badge-details">{{ adm.study_year }}</small>
+                    <small class="badge badge-info badge-details">{{ adm.term_name }}</small>
                   </td>
                   <td>
                     {% if adm.admission_status == 'Approved' %}
-                      <span class="badge badge-success status-badge">Approved</span>
+                    <span class="badge badge-success status-badge">Approved</span>
                     {% elif adm.admission_status == 'Rejected' %}
-                      <span class="badge badge-danger status-badge">Rejected</span>
-                      <small class="rejection-text" title="{{ adm.rejection_reason }}">
-                        Reason: {{ adm.rejection_reason or 'Not stated' }}
-                      </small>
+                    <span class="badge badge-danger status-badge">Rejected</span>
+                    <small class="rejection-text" title="{{ adm.rejection_reason }}">
+                      Reason: {{ adm.rejection_reason or 'Not stated' }}
+                    </small>
                     {% else %}
-                      <span class="badge badge-warning status-badge">Pending</span>
+                    <span class="badge badge-warning status-badge">Pending</span>
                     {% endif %}
                   </td>
                   <td class="text-center">
@@ -172,19 +183,16 @@
                     <div class="dropdown">
                       <button class="btn btn-sm btn-tool" data-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
                       <div class="dropdown-menu dropdown-menu-right shadow">
-                        
                         <form method="POST" action="{{ url_for('admissions_blueprint.update_admission_status', admission_id=adm.admission_id, new_status='Approved') }}">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                           <button type="submit" class="dropdown-item-form text-success">
                             <i class="fas fa-check-circle mr-2"></i> Approve
                           </button>
                         </form>
-
                         <button type="button" class="dropdown-item text-danger btnReject" 
-                                data-action="{{ url_for('admissions_blueprint.update_admission_status', admission_id=adm.admission_id, new_status='Rejected') }}">
+                        data-action="{{ url_for('admissions_blueprint.update_admission_status', admission_id=adm.admission_id, new_status='Rejected') }}">
                           <i class="fas fa-times-circle mr-2"></i> Reject
                         </button>
-
                       </div>
                     </div>
                     {% endif %}
@@ -204,7 +212,6 @@
   <div class="modal-dialog">
     <form method="POST" id="rejectForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-      
       <div class="modal-content">
         <div class="modal-header bg-danger text-white">
           <h5 class="modal-title"><i class="fas fa-times-circle mr-2"></i> Confirm Rejection</h5>
@@ -215,7 +222,7 @@
           <div class="form-group">
             <label class="font-weight-bold">Rejection Reason</label>
             <textarea name="rejection_reason" class="form-control" rows="4" 
-                      placeholder="Why is this application being rejected?" required></textarea>
+            placeholder="Why is this application being rejected?" required></textarea>
           </div>
         </div>
         <div class="modal-footer bg-light">
@@ -234,43 +241,38 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="/static/assets/js/adminlte.js"></script>
+<script src="/static/assets/js/select2.min.js"></script>
 
 <script>
-$(document).ready(function () {
-  // 1. Flash messages logic
-  $('#flash-data span').each(function () {
-    toastr[$(this).data('category') || 'info']($(this).data('message'));
-  });
+  $(document).ready(function () {
+    $('.select2').select2({ });
 
-  // 2. DataTables Configuration
-  var table = $('#admissionTable').DataTable({
-    "paging": true,
-    "lengthChange": true,
-    "searching": false, // Handled by our custom filters at the top
-    "ordering": true,
-    "info": true,
-    "autoWidth": false,
-    "order": [[1, 'desc']], // Sort by date descending
-    "columnDefs": [{ "orderable": false, "targets": [0, 6] }]
-  });
+    $('#flash-data span').each(function () {
+      toastr[$(this).data('category') || 'info']($(this).data('message'));
+    });
 
-  // 3. Handle Select All checkboxes
-  $('#selectAll').on('change', function () {
-    $('.row-checkbox').prop('checked', this.checked);
-  });
+    var table = $('#admissionTable').DataTable({
+      "paging": true,
+      "lengthChange": true,
+      "searching": false, 
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "order": [[1, 'desc']], 
+      "columnDefs": [{ "orderable": false, "targets": [0, 6] }]
+    });
 
-  // 4. Modal Setup for Rejection
-  $(document).on('click', '.btnReject', function (e) {
-    e.preventDefault();
-    var actionUrl = $(this).data('action');
-    
-    // Inject dynamic URL into modal form
-    $('#rejectForm').attr('action', actionUrl);
-    
-    // Clear and show
-    $('#rejectForm textarea').val('');
-    $('#rejectModal').modal('show');
+    $('#selectAll').on('change', function () {
+      $('.row-checkbox').prop('checked', this.checked);
+    });
+
+    $(document).on('click', '.btnReject', function (e) {
+      e.preventDefault();
+      var actionUrl = $(this).data('action');
+      $('#rejectForm').attr('action', actionUrl);
+      $('#rejectForm textarea').val('');
+      $('#rejectModal').modal('show');
+    });
   });
-});
 </script>
 {% endblock %}

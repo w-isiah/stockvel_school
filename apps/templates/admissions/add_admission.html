@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/static/assets/css/select2.min.css">
 <link rel="stylesheet" href="/static/assets/css/select2-bootstrap4.min.css">
 <link rel="stylesheet" href="/static/assets/css/adminlte.min.css">
+<link rel="stylesheet" href="/static/assets/css/select2.min.css">
 
 <style>
     .section-title {
@@ -65,10 +66,10 @@
                 <div class="card-header">
                     <h3 class="card-title text-bold">Online Admission Application Form</h3>
                     <div class="card-tools">
-                        <a href="/admission_list" class="btn btn-tool btn-primary text-white">
-                            <i class="fas fa-list mr-1"></i> View All
-                        </a>
-                    </div>
+    <a href="/admission_list" class="btn btn-sm btn-primary shadow-sm" style="color: #fff !important;">
+        <i class="fas fa-list mr-1"></i> admission list
+    </a>
+</div>
                 </div>
 
                 <form action="{{ url_for('admissions_blueprint.add_admission') }}" method="POST" enctype="multipart/form-data">
@@ -108,7 +109,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Gender<span class="required-star">*</span></label>
-                                    <select name="gender" class="form-control select2bs4" required>
+                                    <select name="gender" class="form-control select2" required>
                                         <option value="">Select Gender</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
@@ -143,7 +144,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Applying for Class<span class="required-star">*</span></label>
-                                    <select name="class_id" class="form-control select2bs4" required>
+                                    <select name="class_id" class="form-control select2" required>
                                         <option value="">Select Class</option>
                                         {% for cls in classes %}
                                         <option value="{{ cls.class_id }}">{{ cls.class_name }}</option>
@@ -154,7 +155,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Proposed Term of Entry<span class="required-star">*</span></label>
-                                    <select name="term_id" class="form-control" required>
+                                    <select name="term_id" class="form-control select2" required>
                                         <option value="1">Term I</option>
                                         <option value="2">Term II</option>
                                         <option value="3">Term III</option>
@@ -164,7 +165,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Study Year<span class="required-star">*</span></label>
-                                    <select name="year_id" class="form-control select2bs4" required>
+                                    <select name="year_id" class="form-control select2" required>
                                         {% for study_year in study_years %}
                                         <option value="{{ study_year.year_id }}">{{ study_year.year_name }}</option>
                                         {% endfor %}
@@ -200,7 +201,7 @@
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Any Medical Condition?<span class="required-star">*</span></label>
-                                    <select name="has_medical" class="form-control" required>
+                                    <select name="has_medical" class="form-control select2" required>
                                         <option value="No">No</option>
                                         <option value="Yes">Yes</option>
                                     </select>
@@ -351,9 +352,11 @@
 <script src="/static/assets/plugins/bs-custom-file-input/bs-custom-file-input.min.js"></script>
 <script src="/static/assets/js/select2.min.js"></script>
 <script src="/static/assets/js/adminlte.min.js"></script>
+<script src="/static/assets/js/select2.min.js"></script>
 
 <script>
     $(document).ready(function () {
+        $('.select2').select2();
         // Initialize Select2 with Bootstrap 4 theme
         $('.select2bs4').select2({
             theme: 'bootstrap4',
