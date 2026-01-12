@@ -44,6 +44,9 @@ def route_default():
 
 
 import uuid
+import uuid
+from flask import request, render_template, flash, session, redirect, url_for
+
 @blueprint.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -88,10 +91,12 @@ def login():
                     conn.commit()
 
                     # Set session values
+                    # We add 'assigned_db' using the 'name_sf' field from your database
                     session.update({
                         'loggedin': True,
                         'id': user['id'],
                         'username': user['username'],
+                        'assigned_db': user.get('assigned_db'), # Fallback to default if empty
                         'profile_image': user.get('profile_image'),
                         'first_name': user.get('first_name'),
                         'role': user.get('role'),
@@ -101,13 +106,18 @@ def login():
 
                     session.permanent = False  # Session ends with browser close
 
-                    flash('Login successful!', 'success')
+                    flash(f"Login successful! Connected to {session['assigned_db']}", 'success')
                     return redirect(url_for('home_blueprint.index'))
 
         except Exception as e:
             flash(f"An error occurred: {str(e)}", 'danger')
 
     return render_template('accounts/login.html')
+
+
+
+
+
 
 
 @blueprint.before_app_request

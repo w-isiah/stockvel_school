@@ -22,6 +22,116 @@ logger = logging.getLogger(__name__)
 
 
 
+
+@blueprint.route('/admission_list')
+def admission_list():
+    # 1. Get the database assigned to this user from the session
+    user_db = session.get('assigned_db')
+
+    # 2. Pass the user's specific database to the connection function
+    connection = get_db_connection(db_name=user_db)
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        # --- The rest of your code remains exactly the same ---
+        
+        # 1. Load filter options
+        cursor.execute('SELECT class_id, class_name FROM classes ORDER BY class_name')
+        class_list = cursor.fetchall()
+        cursor.execute('SELECT year_id, year_name FROM study_year ORDER BY year_name DESC')
+        year_list = cursor.fetchall()
+        cursor.execute('SELECT term_id, term_name FROM terms ORDER BY term_name')
+        term_list = cursor.fetchall()
+
+        # 2. Get search/filter parameters
+        status = request.args.get('status', '').strip()
+        class_id = request.args.get('class_id', '').strip()
+        year_id = request.args.get('year_id', '').strip()
+        term_id = request.args.get('term_id', '').strip()
+        search_name = request.args.get('name', '').strip()
+        search_reg = request.args.get('reg_no', '').strip()
+        
+        # New Date Range Parameters
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+
+        params = {}
+        filters = []
+
+        if status:
+            filters.append("a.admission_status = %(status)s")
+            params['status'] = status
+        if class_id:
+            filters.append("a.class_id = %(class_id)s")
+            params['class_id'] = class_id
+        if year_id:
+            filters.append("a.year_id = %(year_id)s")
+            params['year_id'] = year_id
+        if term_id:
+            filters.append("a.term_id = %(term_id)s")
+            params['term_id'] = term_id
+        if search_name:
+            filters.append("(p.first_name LIKE %(name)s OR p.last_name LIKE %(name)s OR p.other_name LIKE %(name)s)")
+            params['name'] = f"%{search_name}%"
+        if search_reg:
+            filters.append("p.reg_no LIKE %(reg_no)s")
+            params['reg_no'] = f"%{search_reg}%"
+
+        # --- Date Range Logic ---
+        if start_date:
+            filters.append("DATE(a.date_created) >= %(start_date)s")
+            params['start_date'] = start_date
+        if end_date:
+            filters.append("DATE(a.date_created) <= %(end_date)s")
+            params['end_date'] = end_date
+
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+        query = f"""
+            SELECT 
+                a.admission_id, p.reg_no,
+                CONCAT_WS(' ', p.first_name, p.other_name, p.last_name) AS full_name,
+                COALESCE(c.class_name, 'N/A') AS class_name,
+                COALESCE(sy.year_name, 'N/A') AS study_year,
+                COALESCE(t.term_name, 'N/A') AS term_name,
+                a.admission_status, a.rejection_reason, a.date_created
+            FROM admissions a
+            INNER JOIN pupils_admission p ON a.pupil_id = p.pupil_id
+            LEFT JOIN study_year sy ON a.year_id = sy.year_id
+            LEFT JOIN terms t ON a.term_id = t.term_id
+            LEFT JOIN classes c ON CAST(a.class_id AS UNSIGNED) = c.class_id
+            {where_clause}
+            ORDER BY a.date_created DESC
+        """
+        
+        cursor.execute(query, params)
+        admissions = cursor.fetchall()
+
+        return render_template(
+            'admissions/admission_list.html',
+            admissions=admissions,
+            class_list=class_list,
+            year_list=year_list,
+            term_list=term_list,
+            filters={
+                'status': status, 'class_id': class_id, 'year_id': year_id,
+                'term_id': term_id, 'name': search_name, 'reg_no': search_reg, 
+                'start_date': start_date, 'end_date': end_date
+            }
+        )
+        
+    finally:
+        cursor.close()
+        connection.close()        
+
+
+
+        
+
+
+
+
+
 @blueprint.route('/add_admission', methods=['GET', 'POST'])
 def add_admission():
     """Handle admission application form (GET for display, POST for submission)"""
@@ -188,103 +298,6 @@ def add_admission():
 
 
 
-
-
-@blueprint.route('/admission_list')
-def admission_list():
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-
-    try:
-        # 1. Load filter options
-        cursor.execute('SELECT class_id, class_name FROM classes ORDER BY class_name')
-        class_list = cursor.fetchall()
-        cursor.execute('SELECT year_id, year_name FROM study_year ORDER BY year_name DESC')
-        year_list = cursor.fetchall()
-        cursor.execute('SELECT term_id, term_name FROM terms ORDER BY term_name')
-        term_list = cursor.fetchall()
-
-        # 2. Get search/filter parameters
-        status = request.args.get('status', '').strip()
-        class_id = request.args.get('class_id', '').strip()
-        year_id = request.args.get('year_id', '').strip()
-        term_id = request.args.get('term_id', '').strip()
-        search_name = request.args.get('name', '').strip()
-        search_reg = request.args.get('reg_no', '').strip()
-        
-        # New Date Range Parameters
-        start_date = request.args.get('start_date', '').strip()
-        end_date = request.args.get('end_date', '').strip()
-
-        params = {}
-        filters = []
-
-        if status:
-            filters.append("a.admission_status = %(status)s")
-            params['status'] = status
-        if class_id:
-            filters.append("a.class_id = %(class_id)s")
-            params['class_id'] = class_id
-        if year_id:
-            filters.append("a.year_id = %(year_id)s")
-            params['year_id'] = year_id
-        if term_id:
-            filters.append("a.term_id = %(term_id)s")
-            params['term_id'] = term_id
-        if search_name:
-            filters.append("(p.first_name LIKE %(name)s OR p.last_name LIKE %(name)s OR p.other_name LIKE %(name)s)")
-            params['name'] = f"%{search_name}%"
-        if search_reg:
-            filters.append("p.reg_no LIKE %(reg_no)s")
-            params['reg_no'] = f"%{search_reg}%"
-
-        # --- Date Range Logic ---
-        if start_date:
-            filters.append("DATE(a.date_created) >= %(start_date)s")
-            params['start_date'] = start_date
-        if end_date:
-            filters.append("DATE(a.date_created) <= %(end_date)s")
-            params['end_date'] = end_date
-
-        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
-
-        query = f"""
-            SELECT 
-                a.admission_id, p.reg_no,
-                CONCAT_WS(' ', p.first_name, p.other_name, p.last_name) AS full_name,
-                COALESCE(c.class_name, 'N/A') AS class_name,
-                COALESCE(sy.year_name, 'N/A') AS study_year,
-                COALESCE(t.term_name, 'N/A') AS term_name,
-                a.admission_status, a.rejection_reason, a.date_created
-            FROM admissions a
-            INNER JOIN pupils_admission p ON a.pupil_id = p.pupil_id
-            LEFT JOIN study_year sy ON a.year_id = sy.year_id
-            LEFT JOIN terms t ON a.term_id = t.term_id
-            LEFT JOIN classes c ON CAST(a.class_id AS UNSIGNED) = c.class_id
-            {where_clause}
-            ORDER BY a.date_created DESC
-        """
-        
-        cursor.execute(query, params)
-        admissions = cursor.fetchall()
-
-        return render_template(
-            'admissions/admission_list.html',
-            admissions=admissions,
-            class_list=class_list,
-            year_list=year_list,
-            term_list=term_list,
-            filters={
-                'status': status, 'class_id': class_id, 'year_id': year_id,
-                'term_id': term_id, 'name': search_name, 'reg_no': search_reg, 
-                'start_date': start_date, 'end_date': end_date
-            }
-        )
-        
-    finally:
-        cursor.close()
-        connection.close()
-        
 
 
 
