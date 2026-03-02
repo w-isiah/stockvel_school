@@ -128,7 +128,7 @@
         <div class="card">
           <div class="card-header bg-navy d-flex align-items-center">
             <h3 class="card-title"><i class="fas fa-list mr-2"></i> Application List</h3>
-            {% if session['role'] == 'admin' %}
+            {% if session.get('role') in ['admin', 'super_admin'] %}
             <button type="submit" class="btn btn-success btn-sm ml-auto">
               <i class="fas fa-check-double mr-1"></i> Approve Selected
             </button>
@@ -152,60 +152,78 @@
                 {% for adm in admissions %}
                 <tr>
                   <td class="text-center">
-                    {% if session['role'] == 'admin' and adm.admission_status == 'Pending' %}
-                    <input type="checkbox" name="admission_ids[]" value="{{ adm.admission_id }}" class="row-checkbox">
-                    {% else %}
-                    <i class="fas fa-lock text-muted" title="Status locked"></i>
-                    {% endif %}
-                  </td>
-                  <td>{{ adm.date_created.strftime('%d %b %Y') if adm.date_created }}</td>
-                  <td class="text-primary font-weight-bold">{{ adm.reg_no }}</td>
-                  <td>{{ adm.full_name }}</td>
-                  <td>
-                    <span class="text-bold">{{ adm.class_name }}</span><br>
-                    <small class="badge badge-light border badge-details">{{ adm.study_year }}</small>
-                    <small class="badge badge-info badge-details">{{ adm.term_name }}</small>
-                  </td>
-                  <td>
-                    {% if adm.admission_status == 'Approved' %}
-                    <span class="badge badge-success status-badge">Approved</span>
-                    {% elif adm.admission_status == 'Rejected' %}
-                    <span class="badge badge-danger status-badge">Rejected</span>
-                    <small class="rejection-text" title="{{ adm.rejection_reason }}">
-                      Reason: {{ adm.rejection_reason or 'Not stated' }}
-                    </small>
-                    {% else %}
-                    <span class="badge badge-warning status-badge">Pending</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-center">
-                    {% if session['role'] == 'admin' %}
-                    <div class="dropdown">
-                      <button class="btn btn-sm btn-tool" data-toggle="dropdown"><i class="fas fa-ellipsis-v"></i></button>
-                      <div class="dropdown-menu dropdown-menu-right shadow">
-                        <form method="POST" action="{{ url_for('admissions_blueprint.update_admission_status', admission_id=adm.admission_id, new_status='Approved') }}">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                          <button type="submit" class="dropdown-item-form text-success">
-                            <i class="fas fa-check-circle mr-2"></i> Approve
-                          </button>
-                        </form>
-                        <button type="button" class="dropdown-item text-danger btnReject" 
-                        data-action="{{ url_for('admissions_blueprint.update_admission_status', admission_id=adm.admission_id, new_status='Rejected') }}">
-                          <i class="fas fa-times-circle mr-2"></i> Reject
-                        </button>
-                      </div>
-                    </div>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </form>
+                   {% if session.get('role') in ['admin', 'super_admin'] and adm.admission_status == 'Pending' %}
+
+                   <input type="checkbox" name="admission_ids[]" value="{{ adm.admission_id }}" class="row-checkbox">
+                   {% else %}
+                   <i class="fas fa-lock text-muted" title="Status locked"></i>
+                   {% endif %}
+                 </td>
+                 <td>{{ adm.date_created.strftime('%d %b %Y') if adm.date_created }}</td>
+                 <td class="text-primary font-weight-bold">{{ adm.reg_no }}</td>
+                 <td>{{ adm.full_name }}</td>
+                 <td>
+                  <span class="text-bold">{{ adm.class_name }}</span><br>
+                  <small class="badge badge-light border badge-details">{{ adm.study_year }}</small>
+                  <small class="badge badge-info badge-details">{{ adm.term_name }}</small>
+                </td>
+                <td>
+                  {% if adm.admission_status == 'Approved' %}
+                  <span class="badge badge-success status-badge">Approved</span>
+                  {% elif adm.admission_status == 'Rejected' %}
+                  <span class="badge badge-danger status-badge">Rejected</span>
+                  <small class="rejection-text" title="{{ adm.rejection_reason }}">
+                    Reason: {{ adm.rejection_reason or 'Not stated' }}
+                  </small>
+                  {% else %}
+                  <span class="badge badge-warning status-badge">Pending</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if session.get('role') in ['admin', 'super_admin'] 
+                  and adm.admission_status == 'Pending' %}
+
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-tool" data-toggle="dropdown">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-right shadow">
+
+                      <form method="POST"
+                      action="{{ url_for('admissions_blueprint.update_admission_status',
+                      admission_id=adm.admission_id,
+                      new_status='Approved') }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <button type="submit" class="dropdown-item-form text-success">
+                        <i class="fas fa-check-circle mr-2"></i> Approve
+                      </button>
+                    </form>
+
+                    <button type="button"
+                    class="dropdown-item text-danger btnReject"
+                    data-action="{{ url_for('admissions_blueprint.update_admission_status',
+                    admission_id=adm.admission_id,
+                    new_status='Rejected') }}">
+                    <i class="fas fa-times-circle mr-2"></i> Reject
+                  </button>
+
+                </div>
+              </div>
+
+              {% else %}
+              <i class="fas fa-lock text-muted" title="Action not available"></i>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  </section>
+  </div>
+</form>
+</div>
+</section>
 </div>
 
 <div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">

@@ -61,6 +61,8 @@ def format_date(date_data, format_string='%Y-%m-%d'):
     except Exception:
         # Fallback if the object is an unexpected type
         return str(date_data)
+
+
     
 def register_blueprints(app):
     """Register all blueprints dynamically from the apps module."""
@@ -74,7 +76,7 @@ def register_blueprints(app):
         'subject_assign', 'results_update', 'add_marks','assessment','term',
         'classteacher_assign','grade_analysis','eot_reports','past_reports',
         'subject_comments','headmaster_comments','classteacher_comments',
-        'admissions','locations','suppliers','fixed_assets','asset_inventory','password_reset'
+        'admissions','locations','suppliers','fixed_assets','asset_inventory','password_reset','finance','report_1'
     ]
 
     for module_name in modules:

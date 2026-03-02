@@ -129,14 +129,10 @@ def admission_list():
         
 
 
-
-
-
 @blueprint.route('/add_admission', methods=['GET', 'POST'])
 def add_admission():
-    """Handle admission application form (GET for display, POST for submission)"""
-    
-    # Check user session
+    """Display and process admission application form"""
+
     user_id = session.get('id')
     if not user_id:
         flash("Session expired. Please log in again.", "danger")
@@ -146,141 +142,198 @@ def add_admission():
     cursor = connection.cursor(dictionary=True)
 
     try:
-        # GET REQUEST: Display form with classes dropdown
+        # =====================================================
+        # GET REQUEST
+        # =====================================================
         if request.method == 'GET':
-            cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
+            cursor.execute("SELECT * FROM classes ORDER BY class_name ASC")
             classes = cursor.fetchall()
 
-            cursor.execute('SELECT year_id, year_name FROM study_year ORDER BY year_name')
+            cursor.execute("SELECT * FROM terms")
+            terms = cursor.fetchall()
+
+            cursor.execute("SELECT year_id, year_name FROM study_year ORDER BY year_name")
             study_years = cursor.fetchall()
-            return render_template('admissions/add_admission.html', 
-                                 classes=classes,
-                                 study_years=study_years, 
-                                 segment='add_admission')
 
-        # POST REQUEST: Process form submission
-        elif request.method == 'POST':
-            connection.start_transaction()
+            return render_template(
+                'admissions/add_admission.html',
+                classes=classes,
+                terms=terms,
+                study_years=study_years,
+                segment='add_admission'
+            )
 
-            # 1. GENERATE UNIQUE REGISTRATION NUMBER
+        # =====================================================
+        # POST REQUEST
+        # =====================================================
+        connection.start_transaction()
+
+        # -------------------------------
+        # 1. Validate Required Fields
+        # -------------------------------
+        required_fields = [
+            'first_name', 'last_name',
+            'gender', 'class_id',
+            'term_id', 'year_id'
+        ]
+
+        for field in required_fields:
+            if not request.form.get(field):
+                raise ValueError("All required fields must be filled.")
+
+        class_id = request.form['class_id']
+        term_id = request.form['term_id']
+        year_id = request.form['year_id']
+
+        # -------------------------------
+        # 2. Generate Unique Reg Number
+        # -------------------------------
+        def generate_unique_reg_no():
             current_year = datetime.now().year
-            random_suffix = random.randint(1000, 9999)
-            reg_no = f"SJS/{current_year}/{random_suffix}"
+            while True:
+                reg = f"SJS/{current_year}/{random.randint(1000, 9999)}"
+                cursor.execute(
+                    "SELECT 1 FROM pupils_admission WHERE reg_no = %s",
+                    (reg,)
+                )
+                if not cursor.fetchone():
+                    return reg
 
-            # 2. INSERT GUARDIAN (Section E)
-            guardian_data = (
-                request.form.get('guardian_name', '').strip(),
-                request.form.get('relationship', '').strip(),
-                request.form.get('phone_primary', '').strip(),
-                request.form.get('phone_alt', '').strip() or None,
-                request.form.get('email', '').strip(),
-                request.form.get('occupation', '').strip() or None,
-                request.form.get('physical_address', '').strip()
-            )
-            
-            cursor.execute('''INSERT INTO guardians 
-                              (full_name, relationship, phone_primary, phone_alt, 
-                               email, occupation, physical_address) 
-                              VALUES (%s, %s, %s, %s, %s, %s, %s)''', 
-                           guardian_data)
-            guardian_id = cursor.lastrowid
+        reg_no = generate_unique_reg_no()
 
-            # 3. FILE HANDLING (Section G)
-            def save_admission_file(file_key, prefix):
-                """Helper function to save uploaded files"""
-                file = request.files.get(file_key)
-                if file and file.filename:
-                    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                    original_ext = os.path.splitext(file.filename)[1].lower()
-                    filename = secure_filename(f"{prefix}_{timestamp}{original_ext}")
-                    upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                    os.makedirs(os.path.dirname(upload_path), exist_ok=True)
-                    file.save(upload_path)
-                    return filename
-                return None
+        # -------------------------------
+        # 3. Insert Guardian
+        # -------------------------------
+        guardian_values = (
+            request.form.get('guardian_name', '').strip(),
+            request.form.get('relationship', '').strip(),
+            request.form.get('phone_primary', '').strip(),
+            request.form.get('phone_alt') or None,
+            request.form.get('email') or None,
+            request.form.get('occupation') or None,
+            request.form.get('physical_address', '').strip()
+        )
 
-            # Save all uploaded files
-            photo_name = save_admission_file('image', 'photo')
-            birth_cert_name = save_admission_file('birth_cert', 'bcert')
-            report_name = save_admission_file('school_report', 'report')
+        cursor.execute("""
+            INSERT INTO guardians
+            (full_name, relationship, phone_primary, phone_alt,
+             email, occupation, physical_address)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, guardian_values)
 
-            # 4. INSERT PUPIL (Sections A, C, D, F)
-            pupil_data = (
-                guardian_id,
-                reg_no,
-                request.form.get('first_name', '').strip(),
-                request.form.get('other_name', '').strip() or None,
-                request.form.get('last_name', '').strip(),
-                request.form.get('date_of_birth'),
-                request.form.get('gender'),
-                request.form.get('nationality', 'Ugandan').strip(),
-                request.form.get('address', '').strip(),
-                request.form.get('languages_spoken', '').strip() or None,
-                request.form.get('emergency_contact', '').strip() or None,
-                request.form.get('medical_info', '').strip() or None,
-                request.form.get('special_needs', '').strip() or None,
-                request.form.get('prev_school_name', '').strip() or None,
-                request.form.get('reason_for_leaving', '').strip() or None,
-                photo_name
-            )
-            
-            cursor.execute('''INSERT INTO pupils_admission 
-                              (guardian_id, reg_no, first_name, other_name, last_name, 
-                               date_of_birth, gender, nationality, address, languages_spoken, 
-                               emergency_contact, medical_info, special_needs, 
-                               prev_school_name, reason_for_leaving, image) 
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                                      %s, %s, %s, %s, %s, %s)''', 
-                           pupil_data)
-            pupil_id = cursor.lastrowid
+        guardian_id = cursor.lastrowid
 
-            # 5. INSERT ADMISSION (Section B & Accountability)
-            admission_data = (
-                pupil_id,
-                request.form.get('class_id'),
-                request.form.get('term_id'),
-                request.form.get('year_id'),
-                birth_cert_name,
-                report_name,
-                'Pending',  # Initial status
-                user_id
-            )
-            
-            cursor.execute('''INSERT INTO admissions 
-                              (pupil_id, class_id, term_id, year_id, 
-                               birth_cert_path, prev_report_path, admission_status, created_by, date_created) 
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())''', 
-                           admission_data)
+        # -------------------------------
+        # 4. Fetch Admission Fee
+        # -------------------------------
+        cursor.execute("""
+            SELECT amount
+            FROM fee_structure
+            WHERE study_year_id = %s
+              AND term_id = %s
+              AND class_id = %s
+              AND category = 'Admission'
+            LIMIT 1
+        """, (year_id, term_id, class_id))
 
-            # Commit all changes
-            connection.commit()
-            flash(f"Success! Admission {reg_no} has been submitted for review.", "success")
-            return redirect(url_for('admissions_blueprint.add_admission'))
+        fee_row = cursor.fetchone()
+
+        if not fee_row:
+            raise ValueError("Admission fee not configured for selected class/term/year.")
+
+        admission_fee_amount = fee_row['amount']
+
+        # -------------------------------
+        # 5. Insert Application Fee Record
+        # -------------------------------
+        cursor.execute("""
+            INSERT INTO application_fee
+            (application_fee, payment_status)
+            VALUES (%s, 'Unpaid')
+        """, (admission_fee_amount,))
+
+        form_id = cursor.lastrowid
+
+        # -------------------------------
+        # 6. Insert Pupil Record
+        # -------------------------------
+        pupil_values = (
+            guardian_id,
+            reg_no,
+            request.form['first_name'].strip(),
+            request.form.get('other_name') or None,
+            request.form['last_name'].strip(),
+            request.form.get('date_of_birth'),
+            request.form['gender'],
+            request.form.get('nationality', 'Ugandan'),
+            request.form.get('address'),
+            request.form.get('languages_spoken') or None,
+            request.form.get('emergency_contact') or None,
+            request.form.get('medical_info') or None,
+            request.form.get('special_needs') or None,
+            request.form.get('prev_school_name') or None,
+            request.form.get('reason_for_leaving') or None,
+            class_id,
+            term_id,
+            year_id
+        )
+
+        cursor.execute("""
+            INSERT INTO pupils_admission
+            (guardian_id, reg_no, first_name, other_name, last_name,
+             date_of_birth, gender, nationality, address,
+             languages_spoken, emergency_contact, medical_info,
+             special_needs, prev_school_name, reason_for_leaving,
+             class_id, term_id, year_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s)
+        """, pupil_values)
+
+        pupil_id = cursor.lastrowid
+
+        # -------------------------------
+        # 7. Insert Admission Workflow
+        # -------------------------------
+        cursor.execute("""
+            INSERT INTO admissions
+            (pupil_id, class_id, term_id, year_id,
+             admission_status, created_by,
+             form_id, date_created)
+            VALUES (%s, %s, %s, %s,
+                    'Pending', %s,
+                    %s, NOW())
+        """, (
+            pupil_id,
+            class_id,
+            term_id,
+            year_id,
+            user_id,
+            form_id
+        ))
+
+        # -------------------------------
+        # 8. Commit Transaction
+        # -------------------------------
+        connection.commit()
+
+        flash(
+            f"Admission {reg_no} submitted successfully. "
+            f"Application Fee: {admission_fee_amount} (Unpaid)",
+            "success"
+        )
+
+        return redirect(url_for('admissions_blueprint.add_admission'))
 
     except Exception as e:
-        # Rollback on error
-        if connection.is_connected():
-            connection.rollback()
-        
-        logger.error(f"Admission Error: {str(e)}")
-        flash(f"An error occurred: {str(e)}", "danger")
-        
-        # Re-fetch classes so the page can re-render on error
-        cursor.execute('SELECT * FROM classes ORDER BY class_name ASC')
-        classes = cursor.fetchall()
-        return render_template('admissions/add_admission.html', 
-                             classes=classes, 
-                             segment='add_admission')
+        connection.rollback()
+        current_app.logger.error(f"Admission Error: {str(e)}")
+        flash(str(e), "danger")
+        return redirect(url_for('admissions_blueprint.add_admission'))
 
     finally:
-        # Cleanup resources
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-
-
+        cursor.close()
+        connection.close()
 
 
 

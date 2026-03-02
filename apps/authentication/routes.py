@@ -44,7 +44,6 @@ def route_default():
 
 
 import uuid
-import uuid
 from flask import request, render_template, flash, session, redirect, url_for
 
 @blueprint.route('/login', methods=['GET', 'POST'])
@@ -536,6 +535,11 @@ def add_user():
 
 
 
+
+
+
+
+
 @blueprint.route('/edit_user/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_user(id):
@@ -601,6 +605,10 @@ def edit_user(id):
 
 
 
+
+
+
+
 def handle_sign_image(cursor, sign_image, user_id):
     # Check if a signature image is provided and is a valid file type
     if sign_image and allowed_file(sign_image.filename):
@@ -624,6 +632,9 @@ def handle_sign_image(cursor, sign_image, user_id):
 
 
 
+
+
+
 def handle_profile_image(cursor, profile_image, user_id):
     # Check if a profile image is provided and it's a valid file type
     if profile_image and allowed_file(profile_image.filename):
@@ -642,6 +653,9 @@ def handle_profile_image(cursor, profile_image, user_id):
         
         # Return the existing profile image filename or None if not found
         return result['profile_image'] if result else None
+
+
+
 
 
 

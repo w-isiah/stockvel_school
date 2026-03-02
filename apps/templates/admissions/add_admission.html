@@ -152,16 +152,20 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                          
+
+                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>Proposed Term of Entry<span class="required-star">*</span></label>
-                                    <select name="term_id" class="form-control select2" required>
-                                        <option value="1">Term I</option>
-                                        <option value="2">Term II</option>
-                                        <option value="3">Term III</option>
+                                   <label>Proposed Term of Entry<span class="required-star">*</span></label>
+                                     <select name="term_id" class="form-control select2" required>
+                                        {% for term in terms %}
+                                        <option value="{{ term.term_id }}">{{ term.term_name }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                             </div>
+
+
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Study Year<span class="required-star">*</span></label>

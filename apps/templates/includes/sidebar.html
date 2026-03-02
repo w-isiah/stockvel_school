@@ -169,6 +169,14 @@
           </a>
         </li>
 
+        <li class="nav-item">
+          <a href="/streams"
+             class="nav-link {% if segment == 'streams' %}active{% endif %}">
+            <i class="nav-icon fas fa-random"></i>
+            <p>Streams</p>
+          </a>
+        </li>
+
         <!-- Registration & Promotions -->
         <li class="nav-header text-uppercase text-xs mt-2 mb-1">
           <i class="fas fa-user-check mr-1"></i> REGISTRATION
@@ -288,6 +296,42 @@
           </a>
         </li>
         {% endif %}
+
+
+
+        <!-- Finances (Super Admin only) -->
+{% if session.get('role') == 'super_admin' %}
+<li class="nav-header text-uppercase text-xs mt-2 mb-1">
+  <i class="fas fa-money-bill-wave mr-1"></i> FINANCES
+</li>
+
+<li class="nav-item">
+  <a href="/fees-summary"
+     class="nav-link {% if segment == 'fee_management' %}active{% endif %}">
+    <i class="nav-icon fas fa-file-invoice-dollar"></i>
+    <p>Fee Management</p>
+  </a>
+</li>
+
+<li class="nav-item">
+  <a href="/expense_management"
+     class="nav-link {% if segment == 'expense_management' %}active{% endif %}">
+    <i class="nav-icon fas fa-coins"></i>
+    <p>Expense Management</p>
+  </a>
+</li>
+
+<li class="nav-item">
+  <a href="/financial_reports"
+     class="nav-link {% if segment == 'financial_reports' %}active{% endif %}">
+    <i class="nav-icon fas fa-chart-line"></i>
+    <p>Financial Reports</p>
+  </a>
+</li>
+{% endif %}
+
+
+
 
         <!-- E-Learning -->
         <li class="nav-header text-uppercase text-xs mt-2 mb-1">
