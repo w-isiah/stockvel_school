@@ -451,7 +451,7 @@ def download_template():
         return send_file(
             output,
             as_attachment=True,
-            download_name="pupils_template.xlsx",
+            download_name="Learners_template.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:
