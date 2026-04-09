@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from PIL import Image
 import os
 import mysql.connector
+from flask import request, render_template, redirect, url_for, flash
 
 
 from apps import get_db_connection
@@ -36,8 +37,6 @@ def allowed_file(filename):
 @blueprint.route('/', methods=['GET', 'POST'])
 def route_default():
     return redirect(url_for('authentication_blueprint.login'))
-
-
 
 
 
@@ -238,12 +237,6 @@ def check_inactivity():
 
 
 
-
-
-
-
-
-
 @blueprint.route('/logout')
 def logout():
     user_id = session.get('id')
@@ -292,7 +285,7 @@ def logout():
 
 
 
-from flask import request, render_template, redirect, url_for, flash
+
 
 
 @blueprint.route('/signup', methods=['GET', 'POST'])

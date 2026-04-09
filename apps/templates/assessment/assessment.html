@@ -1,39 +1,31 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}Assessment List{% endblock %}
-
 {% block body_class %}sidebar-mini{% endblock %}
 
 {% block stylesheets %}
-<!-- Fonts & Icons -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
 <link rel="stylesheet" href="/static/assets/plugins/fontawesome-free/css/all.min.css">
-<link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
 
-<!-- Theme & Plugins -->
 <link rel="stylesheet" href="/static/assets/css/adminlte.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.3.0/css/responsive.dataTables.min.css">
-<link rel="stylesheet" href="/static/assets/css/mine.css">
 
-<!-- Custom Styles -->
 <style>
+  /* Floating Flash Messages */
   .alert-container {
     position: fixed;
     top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
-    width: 80%;
-    display: none;
+    right: 20px;
+    z-index: 1060;
+    width: 350px;
   }
-  .alert {
-    opacity: 1;
-    transition: opacity 1s ease-out;
-    margin-bottom: 10px;
+  .table-actions {
+    display: flex;
+    gap: 5px;
   }
-  .alert-dismissible {
-    padding-right: 30px;
+  .card-title {
+    font-weight: 600;
   }
 </style>
 {% endblock stylesheets %}
@@ -41,87 +33,73 @@
 {% block content %}
 <div class="content-wrapper">
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="alert-container" id="flashMessageContainer">
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'warning' %}exclamation-circle{% elif category == 'danger' %}times-circle{% else %}info-circle{% endif %}"></i>
-          <span>{{ message }}</span>
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
-
-  <!-- Page Header -->
   <section class="content-header">
     <div class="container-fluid">
-      <div class="row mb-2 align-items-center">
+      <div class="row mb-2">
         <div class="col-sm-6">
-          <h1 class="mb-0">Assessment List</h1>
+          <h1 class="m-0 text-dark"><i class="fas fa-clipboard-list mr-2"></i>Assessment Management</h1>
         </div>
-        <div class="col-sm-6 text-sm-right">
-          <a href="{{ url_for('assessment_blueprint.add_assessment') }}" class="btn btn-success">
-            <i class="fas fa-plus-circle mr-1"></i> Add Assessment
-          </a>
+        <div class="col-sm-6">
+          <div class="float-sm-right">
+            <a href="{{ url_for('assessment_blueprint.add_assessment') }}" class="btn btn-primary shadow-sm">
+              <i class="fas fa-plus mr-1"></i> Create New Assessment
+            </a>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Main Content -->
   <section class="content">
     <div class="container-fluid">
-      <div class="row">
-        <div class="col-12">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Assessments Table</h3>
-            </div>
-
-            <div class="card-body">
-              <div class="table-responsive">
-                <table id="assessmentTable" class="display stripe nowrap" style="width:100%">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Description</th>
-                      <th>Edit</th>
-                      <th>Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for a in assessment %}
-                    <tr>
-                      <td>{{ a.assessment_id }}</td>
-                      <td>{{ a.assessment_name }}</td>
-                      <td>{{ a.description or '—' }}</td>
-                      <td>
-                        <a href="/edit_assessment/{{ a.assessment_id }}" class="btn btn-sm btn-warning">Edit</a>
-                      </td>
-                      <td>
-                        {% if session['role'] == 'super_admin' %}
-                        <a href="/delete_assessment/{{ a.assessment_id }}" class="btn btn-sm btn-danger" 
-                           onclick="return confirm('Delete assessment {{ a.assessment_name }}?')">
-                          Delete
-                        </a>
-                        {% else %}
-                        <span>—</span>
-                        {% endif %}
-                      </td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
+      <div class="card card-outline card-primary">
+        <div class="card-header">
+          <h3 class="card-title">All Registered Assessments</h3>
+          <div class="card-tools">
+            <button type="button" class="btn btn-tool" data-card-widget="collapse">
+              <i class="fas fa-minus"></i>
+            </button>
           </div>
+        </div>
+
+        <div class="card-body">
+          <table id="assessmentTable" class="table table-bordered table-striped responsive nowrap" style="width:100%">
+            <thead>
+              <tr>
+                <th style="width: 80px;">ID</th>
+                <th>Assessment Name</th>
+                <th>Description</th>
+                <th style="width: 150px;" class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in assessment %}
+              <tr>
+                <td class="align-middle"><code>#{{ a.assessment_id }}</code></td>
+                <td class="align-middle font-weight-bold">{{ a.assessment_name }}</td>
+                <td class="align-middle text-muted">
+                  {{ a.description if a.description else '<small class="text-italic text-light">No description provided</small>'|safe }}
+                </td>
+                <td class="align-middle text-center">
+                  <div class="btn-group">
+                    <a href="/edit_assessment/{{ a.assessment_id }}" class="btn btn-sm btn-info shadow-sm" title="Edit">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                    
+                    {% if session['role'] == 'super_admin' %}
+                    <a href="/delete_assessment/{{ a.assessment_id }}" 
+                       class="btn btn-sm btn-danger shadow-sm ml-1" 
+                       title="Delete"
+                       onclick="return confirm('Strict Warning: Are you sure you want to delete [{{ a.assessment_name }}]? This may affect existing reports.')">
+                      <i class="fas fa-trash-alt"></i>
+                    </a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -130,28 +108,39 @@
 {% endblock content %}
 
 {% block javascripts %}
-<!-- Core Libraries -->
 <script src="/static/assets/plugins/jquery/jquery.min.js"></script>
 <script src="/static/assets/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="/static/assets/js/adminlte.js"></script>
 
-<!-- DataTables Plugins -->
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.3.0/js/dataTables.responsive.min.js"></script>
 
-<!-- Page Scripts -->
 <script>
   $(document).ready(function() {
+    // Initialize DataTable
     $('#assessmentTable').DataTable({
-      paging: true,
-      searching: true,
-      ordering: true,
-      responsive: true
+      "paging": true,
+      "lengthChange": true,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "responsive": true,
+      "order": [[0, "desc"]], // Show newest IDs first
+      "language": {
+        "search": "Filter assessments:",
+        "emptyTable": "No assessments found in the database"
+      }
     });
 
+    // Auto-dismiss flash messages after 5 seconds
     const $flash = $('#flashMessageContainer');
     if ($flash.length) {
-      $flash.fadeIn(500).delay(3000).fadeOut(1000);
+      setTimeout(function() {
+        $flash.fadeOut(1000, function() {
+          $(this).remove();
+        });
+      }, 5000);
     }
   });
 </script>

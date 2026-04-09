@@ -46,13 +46,13 @@ def report_1():
     term_id = request.args.get('term_id', type=int)
     assessment_names = request.args.getlist('assessment_name')
 
-    # Guard clause for incomplete filters
     if not all([class_id, year_id, term_id, assessment_names]):
         cursor.close()
         conn.close()
-        return render_template('report_1/report_1.html', **locals(), reports=[], subject_names=[])
+        return render_template('report_1/report_1.html', class_list=class_list, study_years=study_years, 
+                               terms=terms, assessments=assessments, streams=streams, reports=[], subject_names=[])
 
-    # 3. Fetch Divisions and Teacher upfront (Optimized)
+    # 3. Fetch Divisions and Teacher
     cursor.execute("SELECT min_score, max_score, division_name FROM division")
     division_lookup = cursor.fetchall()
 
@@ -66,21 +66,26 @@ def report_1():
     class_teacher = teacher_row['name'] if teacher_row else "Not Assigned"
 
     # 4. Fetch Main Performance Data
-    # Using a single JOIN-heavy query to get everything we need
+    # IMPORTANT: Added t.term_name and sy.year_name to the SELECT
     placeholders = ','.join(['%s'] * len(assessment_names))
-    core_subjects = ['MTC', 'ENGLISH', 'SST', 'SCIE']
+    
+    # Check your DB: if the names are 'MATHEMATICS', 'ENGLISH', etc., change these strings!
+    core_subjects = ['MATH(%)', 'ENGLISH(%)', 'SST', 'SCIE']
     
     query = f"""
         SELECT 
             s.reg_no, p.index_number, p.image,
             CONCAT_WS(' ', p.last_name, p.first_name, p.other_name) AS full_name,
             c.class_name, st.stream_name, st.stream_id,
+            t.term_name, sy.year_name, 
             a.assessment_name, sub.subject_name, s.Mark,
             g.grade_letter, g.weight
         FROM scores s
         JOIN pupils p USING (reg_no)
         JOIN classes c ON p.class_id = c.class_id
         JOIN stream st ON p.stream_id = st.stream_id
+        JOIN terms t ON s.term_id = t.term_id
+        JOIN study_year sy ON s.year_id = sy.year_id
         JOIN assessment a ON s.assessment_id = a.assessment_id
         JOIN subjects sub ON s.subject_id = sub.subject_id
         LEFT JOIN grades g ON s.Mark BETWEEN g.min_score AND g.max_score
@@ -90,9 +95,9 @@ def report_1():
     cursor.execute(query, [class_id, year_id, term_id] + assessment_names)
     rows = cursor.fetchall()
 
-    # 5. Data Structuring & Ranking Logic
+    # 5. Data Structuring
     grouped = {}
-    subject_stats = defaultdict(lambda: defaultdict(list)) # For subject ranking
+    subject_stats = defaultdict(lambda: defaultdict(list))
     subject_names = set()
 
     for row in rows:
@@ -116,10 +121,7 @@ def report_1():
         if val is not None:
             subject_stats[asn][sub].append({'reg': reg, 'mark': val})
 
-    # 6. Calculate Ranks, Aggregates, and Divisions
-    # We do this in Python to keep the SQL simple and fast
-    
-    # Subject Ranks
+    # 6. Ranks, Aggregates, Divisions
     final_subject_ranks = defaultdict(lambda: defaultdict(dict))
     for asn, subs in subject_stats.items():
         for sub, entries in subs.items():
@@ -127,10 +129,13 @@ def report_1():
             for i, e in enumerate(entries):
                 final_subject_ranks[asn][sub][e['reg']] = i + 1
 
-    # Aggregates & Positions
     reports_list = list(grouped.values())
+    
+    # Sorting is MANDATORY for Jinja's |groupby('reg_no') to work!
+    reports_list.sort(key=lambda x: (x['reg_no'], x['assessment_name']))
+
     for r in reports_list:
-        # Calculate individual student metrics
+        # Debugging: if valid_marks is empty, aggregate will be 'X'
         core_marks = [r['marks'].get(s) for s in core_subjects]
         valid_marks = [m for m in core_marks if m is not None]
         
@@ -143,15 +148,12 @@ def report_1():
         r['average_score'] = round(sum(valid_marks)/len(valid_marks), 1) if valid_marks else 0
         r['subject_ranks'] = {s: final_subject_ranks[r['assessment_name']][s].get(r['reg_no'], '-') for s in subject_names}
 
-    # Class & Stream Positions (Grouping by Assessment)
+    # Positions
     for asn in assessment_names:
         asn_students = [r for r in reports_list if r['assessment_name'] == asn]
-        
-        # Class Position
         asn_students.sort(key=lambda x: x['average_score'], reverse=True)
         for i, r in enumerate(asn_students): r['class_position'] = i + 1
         
-        # Stream Position
         streams_in_asn = {r['stream_id'] for r in asn_students}
         for s_id in streams_in_asn:
             str_students = [r for r in asn_students if r['stream_id'] == s_id]
@@ -169,6 +171,6 @@ def report_1():
         selected_class_id=class_id, selected_stream_id=stream_id,
         selected_study_year_id=year_id, selected_term_id=term_id,
         selected_assessment_name=assessment_names,
-        total_class_size=len([r for r in reports_list if r['assessment_name'] == assessment_names[0]]),
+        total_class_size=len([r for r in reports_list if r['assessment_name'] == assessment_names[0]]) if reports_list else 0,
         segment='reports'
     )
